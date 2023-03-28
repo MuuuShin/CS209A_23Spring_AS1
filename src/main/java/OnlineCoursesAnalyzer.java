@@ -5,7 +5,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.*;
 
 public class OnlineCoursesAnalyzer {
@@ -76,10 +78,7 @@ public class OnlineCoursesAnalyzer {
         Map<String, List<String>> singleCourseListOfInstructor =
                 courseStream.filter(x -> !x.getInstructors().contains(","))
                         .sorted(Comparator.comparing(Course::getTitle))
-                        .flatMap(x -> {
-                            String[] instructors = x.getInstructors().split(", ");
-                            return Arrays.stream(instructors).map(y -> new AbstractMap.SimpleEntry<>(y, x.getTitle()));
-                        })
+                        .map(x -> new AbstractMap.SimpleEntry<>(x.getInstructors(), x.getTitle()))
                         .distinct()
                         .collect(
                                 Collectors.groupingBy(
@@ -106,7 +105,7 @@ public class OnlineCoursesAnalyzer {
         allInstructors.addAll(multiCourseListOfInstructor.keySet());
         //merge two maps
         Map<String, List<List<String>>> courseListOfInstructor = new HashMap<>();
-        for(String instructor:allInstructors){
+        for (String instructor : allInstructors) {
             List<List<String>> courseList = new ArrayList<>();
             courseList.add(singleCourseListOfInstructor.getOrDefault(instructor, new ArrayList<>()));
             courseList.add(multiCourseListOfInstructor.getOrDefault(instructor, new ArrayList<>()));
@@ -117,20 +116,119 @@ public class OnlineCoursesAnalyzer {
 
     //4
     public List<String> getCourses(int topK, String by) {
-        return null;
+        Stream<Course> courseStream = courseStreamSupplier.get();
+        List<String> topCourses;
+        switch (by) {
+            case "hours" -> {
+                topCourses = courseStream
+                        .collect(Collectors.toMap(Course::getTitle, Course::getTotalHours, Math::max))
+                        .entrySet().stream()
+                        .sorted(
+                                Comparator.comparing((Function<Map.Entry<String, Double>, Double>) Map.Entry::getValue)
+                                        .reversed().thenComparing(Map.Entry::getKey)
+                        )
+                        .limit(topK).map(Map.Entry::getKey).toList();
+                break;
+            }
+            case "participants" -> {
+                topCourses = courseStream
+                        .collect(Collectors.toMap(Course::getTitle, Course::getParticipants, Math::max))
+                        .entrySet().stream()
+                        .sorted(
+                                Comparator.comparing((Function<Map.Entry<String, Integer>, Integer>) Map.Entry::getValue)
+                                        .reversed().thenComparing(Map.Entry::getKey)
+                        )
+                        .limit(topK).map(Map.Entry::getKey).toList();
+                break;
+            }
+            default -> {
+                topCourses = new ArrayList<>();
+            }
+        }
+        return topCourses;
     }
 
     //5
     public List<String> searchCourses(String courseSubject, double percentAudited, double totalCourseHours) {
-        return null;
+        String courseSubjectLow = courseSubject.toLowerCase();
+        Stream<Course> courseStream = courseStreamSupplier.get();
+        List<String> searchCourses = courseStream
+                .filter(x -> Pattern.matches(".+" + courseSubjectLow + ".+", x.getTitle().toLowerCase()))
+                .filter(x -> x.getPercentAudited() >= percentAudited)
+                .filter(x -> x.getTotalHours() <= totalCourseHours)
+                .map(Course::getTitle).sorted().distinct().toList();
+        return searchCourses;
     }
 
     //6
     public List<String> recommendCourses(int age, int gender, int isBachelorOrHigher) {
-        return null;
+        Stream<Course> courseStream = courseStreamSupplier.get();
+
+        Map<String, CourseScore> courseScoreList = courseStream.collect(
+                Collectors.groupingBy(
+                        Course::getNumber,
+                        Collectors.collectingAndThen(
+                                Collectors.toList(),
+                                list -> {
+                                    double ageSum = 0, genderSum = 0, degreeSum = 0;
+                                    int ageCnt = 0, genderCnt = 0, degreeCnt = 0,year=-1;
+                                    String courseTitle = "";
+                                    for (Course course : list) {
+                                        if(course.getYear()>year){
+                                            courseTitle = course.getTitle();
+                                            year = course.getYear();
+                                        }
+                                        ageSum += course.getMedianAge();
+                                        genderSum += course.getPercentMale();
+                                        degreeSum += course.getPercentDegree();
+                                        ageCnt++;
+                                        genderCnt++;
+                                        degreeCnt++;
+                                    }
+                                    double ageAvg = ageSum / ageCnt;
+                                    double genderAvg = genderSum / genderCnt;
+                                    double degreeAvg = degreeSum / degreeCnt;
+                                    return new CourseScore(courseTitle,ageAvg, genderAvg, degreeAvg);
+                                }
+                        )
+                )
+        );
+
+        List<String> recommendCourses=courseScoreList.entrySet().stream().sorted((o1,o2)->{
+            double c1=o1.getValue().calcScore(age,gender,isBachelorOrHigher);
+            double c2=o2.getValue().calcScore(age,gender,isBachelorOrHigher);
+            if(c1==c2){
+                return -1*o1.getValue().courseTitle.compareTo(o2.getValue().courseTitle);
+            }else{
+                return Double.compare(c1,c2);
+            }
+        }).limit(10).map(x->x.getValue().courseTitle).toList();
+
+        return recommendCourses;
     }
 
 }
+
+
+class CourseScore {
+
+    double ageAvg, genderAvg, degreeAvg;
+    String courseTitle;
+    public CourseScore(String courseTitle, double ageAvg, double genderAvg, double degreeAvg) {
+        this.courseTitle = courseTitle;
+        this.ageAvg = ageAvg;
+        this.genderAvg = genderAvg;
+        this.degreeAvg = degreeAvg;
+    }
+
+    public double calcScore(int age, int gender, int isBachelorOrHigher) {
+        double score = Math.pow(age - ageAvg, 2)
+                + Math.pow(gender * 100 - genderAvg * 100, 2)
+                + Math.pow(isBachelorOrHigher * 100 - degreeAvg * 100, 2);
+        return score;
+    }
+}
+
 
 class Course {
     String institution;
