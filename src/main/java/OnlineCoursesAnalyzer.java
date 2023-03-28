@@ -152,8 +152,9 @@ public class OnlineCoursesAnalyzer {
     public List<String> searchCourses(String courseSubject, double percentAudited, double totalCourseHours) {
         String courseSubjectLow = courseSubject.toLowerCase();
         Stream<Course> courseStream = courseStreamSupplier.get();
+        //List<Course> a=courseStream.filter(x -> Pattern.matches(".*" + courseSubjectLow + ".*", x.getSubject().toLowerCase())).toList();
         List<String> searchCourses = courseStream
-                .filter(x -> Pattern.matches(".+" + courseSubjectLow + ".+", x.getTitle().toLowerCase()))
+                .filter(x -> Pattern.matches(".*" + courseSubjectLow + ".*", x.getSubject().toLowerCase()))
                 .filter(x -> x.getPercentAudited() >= percentAudited)
                 .filter(x -> x.getTotalHours() <= totalCourseHours)
                 .map(Course::getTitle).sorted().distinct().toList();
@@ -171,10 +172,10 @@ public class OnlineCoursesAnalyzer {
                                 Collectors.toList(),
                                 list -> {
                                     double ageSum = 0, genderSum = 0, degreeSum = 0;
-                                    int ageCnt = 0, genderCnt = 0, degreeCnt = 0,year=-1;
+                                    int ageCnt = 0, genderCnt = 0, degreeCnt = 0, year = -1;
                                     String courseTitle = "";
                                     for (Course course : list) {
-                                        if(course.getYear()>year){
+                                        if (course.getYear() > year) {
                                             courseTitle = course.getTitle();
                                             year = course.getYear();
                                         }
@@ -188,21 +189,21 @@ public class OnlineCoursesAnalyzer {
                                     double ageAvg = ageSum / ageCnt;
                                     double genderAvg = genderSum / genderCnt;
                                     double degreeAvg = degreeSum / degreeCnt;
-                                    return new CourseScore(courseTitle,ageAvg, genderAvg, degreeAvg);
+                                    return new CourseScore(courseTitle, ageAvg, genderAvg, degreeAvg);
                                 }
                         )
                 )
         );
 
-        List<String> recommendCourses=courseScoreList.entrySet().stream().sorted((o1,o2)->{
-            double c1=o1.getValue().calcScore(age,gender,isBachelorOrHigher);
-            double c2=o2.getValue().calcScore(age,gender,isBachelorOrHigher);
-            if(c1==c2){
-                return -1*o1.getValue().courseTitle.compareTo(o2.getValue().courseTitle);
-            }else{
-                return Double.compare(c1,c2);
+        List<String> recommendCourses = courseScoreList.entrySet().stream().sorted((o1, o2) -> {
+            double c1 = o1.getValue().calcScore(age, gender, isBachelorOrHigher);
+            double c2 = o2.getValue().calcScore(age, gender, isBachelorOrHigher);
+            if (c1 == c2) {
+                return -1 * o1.getValue().courseTitle.compareTo(o2.getValue().courseTitle);
+            } else {
+                return Double.compare(c1, c2);
             }
-        }).limit(10).map(x->x.getValue().courseTitle).toList();
+        }).map(x -> x.getValue().courseTitle).distinct().limit(10).toList();
 
         return recommendCourses;
     }
@@ -214,6 +215,7 @@ class CourseScore {
 
     double ageAvg, genderAvg, degreeAvg;
     String courseTitle;
+
     public CourseScore(String courseTitle, double ageAvg, double genderAvg, double degreeAvg) {
         this.courseTitle = courseTitle;
         this.ageAvg = ageAvg;
@@ -223,8 +225,8 @@ class CourseScore {
 
     public double calcScore(int age, int gender, int isBachelorOrHigher) {
         double score = Math.pow(age - ageAvg, 2)
-                + Math.pow(gender * 100 - genderAvg * 100, 2)
-                + Math.pow(isBachelorOrHigher * 100 - degreeAvg * 100, 2);
+                + Math.pow(gender * 100 - genderAvg, 2)
+                + Math.pow(isBachelorOrHigher * 100 - degreeAvg, 2);
         return score;
     }
 }
