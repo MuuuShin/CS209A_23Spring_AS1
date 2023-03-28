@@ -82,18 +82,23 @@ public class OnlineCoursesAnalyzer {
     //                courseStream.map(x->new AbstractMap.SimpleEntry<>
     //                (x.getInstitution() +"-"+ x.getSubject(),x.getParticipants()))
     //                .sorted(Map.Entry::getKey)
-    Map<String, Integer> ptcpCountByInstAndSubject =
-            courseStream.collect(
-                            Collectors.groupingBy(
-                                    course -> course.getInstitution() + "-" + course.getSubject(),
-                                    Collectors.summingInt(Course::getParticipants)))
-                    .entrySet().stream().sorted((e1, e2) -> {
-                      if (Objects.equals(e1.getValue(), e2.getValue())) {
-                        return e1.getKey().compareTo(e2.getKey());
-                      } else {
-                        return e2.getValue() - e1.getValue();
-                      }
-                    }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (o1, o2) -> o1, LinkedHashMap::new));
+    Map<String, Integer> ptcpCountByInstAndSubject = courseStream
+            .collect(
+                    Collectors.groupingBy(
+                            course -> course.getInstitution() + "-" + course.getSubject(),
+                            Collectors.summingInt(Course::getParticipants)))
+            .entrySet().stream().sorted((e1, e2) -> {
+              if (Objects.equals(e1.getValue(), e2.getValue())) {
+                return e1.getKey().compareTo(e2.getKey());
+              } else {
+                return e2.getValue() - e1.getValue();
+              }
+            }).collect(Collectors.toMap(
+                    Map.Entry::getKey,
+                    Map.Entry::getValue,
+                    (o1, o2) -> o1,
+                    LinkedHashMap::new
+            ));
     return ptcpCountByInstAndSubject;
   }
 
@@ -239,7 +244,7 @@ public class OnlineCoursesAnalyzer {
       double c1 = o1.getValue().calcScore(age, gender, isBachelorOrHigher);
       double c2 = o2.getValue().calcScore(age, gender, isBachelorOrHigher);
       if (c1 == c2) {
-        return -1 * o1.getValue().courseTitle.compareTo(o2.getValue().courseTitle);
+        return o1.getValue().courseTitle.compareTo(o2.getValue().courseTitle);
       } else {
         return Double.compare(c1, c2);
       }
@@ -247,7 +252,6 @@ public class OnlineCoursesAnalyzer {
 
     return recommendCourses;
   }
-
 }
 
 
@@ -296,7 +300,7 @@ class CourseScore {
    * @param isBachelorOrHigher the is bachelor or higher
    * @return the double
    */
-  public double calcScore(int age, int gender, int isBachelorOrHigher) {
+  public double calcScore(double age, double gender, double isBachelorOrHigher) {
     return Math.pow(age - ageAvg, 2)
             + Math.pow(gender * 100 - genderAvg, 2)
             + Math.pow(isBachelorOrHigher * 100 - degreeAvg, 2);
